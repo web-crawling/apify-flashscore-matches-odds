@@ -74,11 +74,11 @@
 												"description": "Current decimal odds value"
 											},
 											"opening_odds": {
-												"type": ["number", "null"],
+												"type": "number",
 												"description": "Opening odds at market open"
 											},
 											"handicap": {
-												"type": ["number", "null"],
+												"type": "number",
 												"description": "Handicap/line value for spread and total markets"
 											},
 											"is_active": {

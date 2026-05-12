@@ -24,16 +24,8 @@
 			"title": "Bet Types",
 			"type": "array",
 			"editor": "stringList",
-			"description": "Filter which bet types to include. Valid values: HOME_DRAW_AWAY (football 1X2), HOME_AWAY (two-way), OVER_UNDER (totals), ASIAN_HANDICAP (spread), DRAW_NO_BET, DOUBLE_CHANCE, EUROPEAN_HANDICAP. Leave empty to include all bet types.",
+			"description": "Filter which bet types to include. Valid values: HOME_DRAW_AWAY (football 1X2), HOME_AWAY (two-way, e.g. basketball), OVER_UNDER (totals), ASIAN_HANDICAP (spread), DRAW_NO_BET, DOUBLE_CHANCE, EUROPEAN_HANDICAP, BOTH_TEAMS_TO_SCORE. Leave empty to include all bet types.",
 			"default": [],
-			"required": false
-		},
-		"geoIpCode": {
-			"title": "Geo IP Code",
-			"type": "string",
-			"editor": "textfield",
-			"description": "Two-letter ISO country code (e.g., 'GB', 'RO', 'DE') to determine bookmaker availability by region. Default 'GB' returns a broad international set of bookmakers.",
-			"default": "GB",
 			"required": false
 		},
 		"maxItems": {

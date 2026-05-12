@@ -5,7 +5,7 @@ Extract live and opening betting odds from Flashscore for football and basketbal
 ## Features
 
 - **Multi-bookmaker odds** — Returns all bookmakers available for each match via the Flashscore odds feed
-- **7 bet types** — HOME_DRAW_AWAY (1X2), OVER_UNDER, ASIAN_HANDICAP, DRAW_NO_BET, DOUBLE_CHANCE, EUROPEAN_HANDICAP, BOTH_TEAMS_TO_SCORE
+- **8 bet types** — HOME_DRAW_AWAY (1X2), HOME_AWAY (two-way), OVER_UNDER, ASIAN_HANDICAP, DRAW_NO_BET, DOUBLE_CHANCE, EUROPEAN_HANDICAP, BOTH_TEAMS_TO_SCORE
 - **Opening odds + live odds** — Both current and opening lines returned per selection, enabling line movement tracking
 - **Football and basketball** — Works for any football or basketball match on Flashscore
 - **Flexible input** — Accept Flashscore match page URLs or raw match IDs (same IDs output by [Flashscore Extractor](https://apify.com/extractify-labs/flashscore-extractor))
@@ -40,7 +40,7 @@ Power odds tickers, matchup preview articles, and editorial content with live bo
 |-----------|------|----------|---------|-------------|
 | `startUrls` | array | Conditional | — | Flashscore match page URLs. Required if `matchIds` is not provided. Example: `https://www.flashscore.com/match/football/arsenal-west-ham/8Cxbx9Wh/` |
 | `matchIds` | array | Conditional | — | Flashscore match IDs (e.g. `["8Cxbx9Wh", "8r8XHz43"]`). These are the same IDs in the `match_id` field of [Flashscore Extractor](https://apify.com/extractify-labs/flashscore-extractor) output. Either `startUrls` or `matchIds` must be provided. |
-| `betTypes` | array | No | all types | Filter results to specific bet types. Accepted values: `HOME_DRAW_AWAY`, `OVER_UNDER`, `ASIAN_HANDICAP`, `DRAW_NO_BET`, `DOUBLE_CHANCE`, `EUROPEAN_HANDICAP`, `BOTH_TEAMS_TO_SCORE`. Omit to return all available bet types. |
+| `betTypes` | array | No | all types | Filter results to specific bet types. Accepted values: `HOME_DRAW_AWAY`, `HOME_AWAY`, `OVER_UNDER`, `ASIAN_HANDICAP`, `DRAW_NO_BET`, `DOUBLE_CHANCE`, `EUROPEAN_HANDICAP`, `BOTH_TEAMS_TO_SCORE`. Omit to return all available bet types. |
 | `maxItems` | integer | No | unlimited | Maximum number of match items to return. Each match is one item. |
 
 > **Note on bookmaker availability:** Bookmakers published for each match depend on the geographic location of the Apify server running the actor. Flashscore validates requests against the actual client IP — this cannot be overridden. When run on Apify's infrastructure, the actor returns bookmakers available in the European/UK region.
@@ -222,7 +222,7 @@ A: Team names are not available from the odds API endpoint in v1. Run [Flashscor
 
 **Q: What bet types are supported?**
 
-A: Seven bet types are supported: `HOME_DRAW_AWAY` (1X2), `OVER_UNDER`, `ASIAN_HANDICAP`, `DRAW_NO_BET`, `DOUBLE_CHANCE`, `EUROPEAN_HANDICAP`, and `BOTH_TEAMS_TO_SCORE`. The actual types available for a given match depend on what Flashscore bookmakers publish. Use the `betTypes` input parameter to filter to specific types.
+A: Eight bet types are supported: `HOME_DRAW_AWAY` (1X2), `HOME_AWAY` (two-way, common for basketball), `OVER_UNDER`, `ASIAN_HANDICAP`, `DRAW_NO_BET`, `DOUBLE_CHANCE`, `EUROPEAN_HANDICAP`, and `BOTH_TEAMS_TO_SCORE`. The actual types available for a given match depend on what Flashscore bookmakers publish. Use the `betTypes` input parameter to filter to specific types.
 
 **Q: One of my match IDs returned an empty `bookmakers` array. Why?**
 

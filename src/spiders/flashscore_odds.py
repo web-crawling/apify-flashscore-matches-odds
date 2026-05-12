@@ -188,7 +188,6 @@ class FlashscoreOddsSpider(scrapy.Spider):
         """Read geolocation cookie; yield one pobtm request per match."""
         geo_code, geo_sub = "GB", "GB"
 
-        # Try Set-Cookie response headers first
         for ck in response.headers.getlist("Set-Cookie"):
             ck_str = ck.decode("utf-8", errors="ignore") if isinstance(ck, bytes) else str(ck)
             if "geolocation=" in ck_str:
@@ -199,9 +198,12 @@ class FlashscoreOddsSpider(scrapy.Spider):
                 logger.info("geolocation cookie: %s → code=%s sub=%s", raw, geo_code, geo_sub)
                 break
         else:
-            # Cookie might be in the response body (set via JS) — try the request's cookiejar
             logger.warning("geolocation not found in Set-Cookie; using default GB/GB")
 
+        yield from self._yield_match_requests(geo_code, geo_sub)
+
+    def _yield_match_requests(self, geo_code: str, geo_sub: str):
+        """Initialise per-match state and yield one pobtm request per match."""
         odds_requests = self.settings.get("ODDS_REQUESTS", [])
         for req_info in odds_requests:
             event_id = req_info["event_id"]
@@ -211,8 +213,8 @@ class FlashscoreOddsSpider(scrapy.Spider):
                 "match_id": event_id,
                 "match_url": match_url,
                 "sport": sport,
-                "bm_acc": {},   # bookmaker_id → {name, markets: {(bt, bs): {...}}}
-                "pending": 0,   # number of outstanding ope2 requests
+                "bm_acc": {},
+                "pending": 0,
             }
             url = POBTM_URL.format(event_id=event_id, geo_code=geo_code, geo_sub=geo_sub)
             yield scrapy.Request(
@@ -347,12 +349,8 @@ class FlashscoreOddsSpider(scrapy.Spider):
         yield loader.load_item()
 
     def errback_home(self, failure):
-        logger.error("Homepage request failed — cannot acquire geo cookie: %s", repr(failure.value))
-        # Still proceed with default geo; spider cannot yield items without match requests
-        # Re-create the callback path with default geo
-        # Unfortunately errback can't easily resume — just log and let it fail
-        # All pending matches will never have their pobtm requests yielded.
-        # This is a blocker — if homepage fails, geo detection fails.
+        logger.warning("Homepage request failed; falling back to default geo GB/GB: %s", repr(failure.value))
+        yield from self._yield_match_requests("GB", "GB")
 
     def errback_menu(self, failure):
         request = failure.request

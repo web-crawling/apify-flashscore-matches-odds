@@ -7,7 +7,6 @@ Input parameters:
 - startUrls:  list of Flashscore match URLs (conditional, at least one of startUrls/matchIds required)
 - matchIds:   list of Flashscore event IDs (conditional, at least one of startUrls/matchIds required)
 - betTypes:   list of bet-type enum strings to filter output (optional; omit for all)
-- geoIpCode:  ISO 3166-1 alpha-2 country code for bookmaker availability (default "GB")
 - maxItems:   maximum number of output items/matches (optional)
 """
 
@@ -53,7 +52,6 @@ async def main() -> None:
         start_urls: list = actor_input.get('startUrls') or []
         match_ids: list = actor_input.get('matchIds') or []
         bet_types: list = actor_input.get('betTypes') or []
-        geo_ip_code: str = actor_input.get('geoIpCode') or 'GB'
         max_items: int | None = actor_input.get('maxItems')
 
         # Validation: at least one of startUrls or matchIds must be provided.
@@ -94,10 +92,8 @@ async def main() -> None:
             )
             return
 
-        # Build the final list of request dicts expected by the spider.
-        # Each dict has: event_id, match_url, geo_ip_code.
         odds_requests: list[dict] = [
-            {'event_id': event_id, 'match_url': match_url, 'geo_ip_code': geo_ip_code}
+            {'event_id': event_id, 'match_url': match_url}
             for event_id, match_url in seen.items()
         ]
 
