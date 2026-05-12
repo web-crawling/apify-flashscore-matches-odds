@@ -9,31 +9,27 @@
 			"type": "array",
 			"editor": "requestListSources",
 			"description": "Flashscore match URLs to extract odds for. Either startUrls or matchIds must be provided. Each URL must contain '/match/' in the path (e.g., https://www.flashscore.com/match/football/leeds-tUxUbLR2/tottenham-UDg08Ohm/?mid=nclkvV1t).",
-			"default": [],
-			"required": false
+			"default": []
 		},
 		"matchIds": {
 			"title": "Match IDs",
 			"type": "array",
 			"editor": "stringList",
 			"description": "Flashscore match IDs to extract odds for (alternative to startUrls). These are the same match_id values output by the flashscore-extractor actor. Either startUrls or matchIds must be provided.",
-			"default": [],
-			"required": false
+			"default": []
 		},
 		"betTypes": {
 			"title": "Bet Types",
 			"type": "array",
 			"editor": "stringList",
 			"description": "Filter which bet types to include. Valid values: HOME_DRAW_AWAY (football 1X2), HOME_AWAY (two-way, e.g. basketball), OVER_UNDER (totals), ASIAN_HANDICAP (spread), DRAW_NO_BET, DOUBLE_CHANCE, EUROPEAN_HANDICAP, BOTH_TEAMS_TO_SCORE. Leave empty to include all bet types.",
-			"default": [],
-			"required": false
+			"default": []
 		},
 		"maxItems": {
 			"title": "Maximum Items",
 			"type": "integer",
 			"editor": "number",
-			"description": "Maximum number of match items to extract. Leave empty for no limit.",
-			"required": false
+			"description": "Maximum number of match items to extract. Leave empty for no limit."
 		}
 	}
 }
