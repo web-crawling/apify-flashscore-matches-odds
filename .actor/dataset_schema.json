@@ -1,0 +1,114 @@
+{
+	"actorSpecification": 1,
+	"fields": {
+		"match_id": {
+			"type": "string",
+			"description": "Unique Flashscore match identifier"
+		},
+		"match_url": {
+			"type": "string",
+			"format": "uri",
+			"description": "Canonical match URL on Flashscore"
+		},
+		"home_team": {
+			"type": "string",
+			"description": "Home team name"
+		},
+		"away_team": {
+			"type": "string",
+			"description": "Away team name"
+		},
+		"sport": {
+			"type": "string",
+			"description": "Sport name (e.g., 'football', 'basketball')"
+		},
+		"scraped_at": {
+			"type": "string",
+			"format": "date-time",
+			"description": "ISO 8601 UTC timestamp when odds were fetched"
+		},
+		"bookmakers": {
+			"type": "array",
+			"description": "Array of bookmakers with their odds",
+			"items": {
+				"type": "object",
+				"properties": {
+					"bookmaker_id": {
+						"type": "integer",
+						"description": "Unique bookmaker identifier"
+					},
+					"bookmaker_name": {
+						"type": "string",
+						"description": "Bookmaker display name"
+					},
+					"markets": {
+						"type": "array",
+						"description": "Array of betting markets",
+						"items": {
+							"type": "object",
+							"properties": {
+								"bet_type": {
+									"type": "string",
+									"description": "Betting type (HOME_DRAW_AWAY, HOME_AWAY, OVER_UNDER, etc.)"
+								},
+								"bet_scope": {
+									"type": "string",
+									"description": "Time period (FULL_TIME, FIRST_HALF, 1ST_QRT, etc.)"
+								},
+								"has_live_betting": {
+									"type": "boolean",
+									"description": "Whether live betting is available for this market"
+								},
+								"odds": {
+									"type": "array",
+									"description": "Array of individual odds selections",
+									"items": {
+										"type": "object",
+										"properties": {
+											"selection": {
+												"type": "string",
+												"description": "Outcome selection (HOME, DRAW, AWAY, OVER, UNDER)"
+											},
+											"odds": {
+												"type": "number",
+												"description": "Current decimal odds value"
+											},
+											"opening_odds": {
+												"type": "number",
+												"description": "Opening odds at market open"
+											},
+											"handicap": {
+												"type": "number",
+												"description": "Handicap/line value for spread and total markets"
+											},
+											"is_active": {
+												"type": "boolean",
+												"description": "Whether this odd is currently active/tradeable"
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"views": {
+		"overview": {
+			"title": "Match Odds Overview",
+			"description": "Summary of matches and their bookmaker odds",
+			"display": {
+				"component": "table",
+				"properties": {
+					"match_id": { "label": "Match ID" },
+					"home_team": { "label": "Home" },
+					"away_team": { "label": "Away" },
+					"sport": { "label": "Sport" },
+					"scraped_at": { "label": "Scraped At", "format": "date-time" }
+				}
+			}
+		}
+	}
+}

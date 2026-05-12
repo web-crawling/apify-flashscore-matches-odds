@@ -1,0 +1,21 @@
+{
+	"actorSpecification": 1,
+	"name": "flashscore-matches-odds",
+	"title": "Flashscore: Match Betting Odds",
+	"description": "Extract betting odds from Flashscore for football and basketball matches. Supports multiple bookmakers, bet types, and time periods.",
+	"version": "1.0",
+	"buildTag": "latest",
+	"meta": {
+		"templateId": "python-scrapy",
+		"generatedBy": "Extractify"
+	},
+	"readme": "./README.md",
+	"changelog": "./CHANGELOG.md",
+	"input": "./input_schema.json",
+	"storages": {
+		"dataset": "./dataset_schema.json"
+	},
+	"dockerfile": "../Dockerfile",
+	"category": "OTHER",
+	"environmentVariables": {}
+}
