@@ -9,7 +9,10 @@
 			"type": "array",
 			"editor": "requestListSources",
 			"description": "Flashscore match URLs to extract odds for. Either startUrls or matchIds must be provided. Each URL must contain '/match/' in the path (e.g., https://www.flashscore.com/match/football/leeds-tUxUbLR2/tottenham-UDg08Ohm/?mid=nclkvV1t).",
-			"default": []
+			"default": [],
+			"prefill": [
+				{ "url": "https://www.flashscore.com/match/football/arsenal-west-ham/8Cxbx9Wh/" }
+			]
 		},
 		"matchIds": {
 			"title": "Match IDs",
