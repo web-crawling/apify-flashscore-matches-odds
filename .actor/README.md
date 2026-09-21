@@ -5,7 +5,7 @@ Extract pre-match and live in-play betting odds from Flashscore for football and
 ## Features
 
 - **Multi-bookmaker odds** — Returns all bookmakers available for each match via the Flashscore odds feed
-- **Pre-match or live in-play odds** — Choose with `oddsType`. Pre-match returns the current and opening line before kick-off; live returns in-play prices that move during the match, including in-play-only markets such as next goal. `both` returns each, tagged by `odds_type`
+- **Pre-match and live in-play odds** — By default a run returns everything the match publishes: the pre-match lines, plus in-play prices while it is being played, each market tagged with `odds_type`. Narrow to one feed with `oddsType` if you only want one
 - **Bet types by sport and state** — Pre-match football publishes HOME_DRAW_AWAY (1X2), OVER_UNDER, BOTH_TEAMS_TO_SCORE and DOUBLE_CHANCE; pre-match basketball publishes HOME_DRAW_AWAY, HOME_AWAY (two-way), OVER_UNDER and ASIAN_HANDICAP. Live football adds ASIAN_HANDICAP and NEXT_GOAL
 - **Opening price and latest movement** — Every selection carries its opening line plus `change_direction` and `previous_odds`, so you can see which way a price just moved and from where
 - **Football and basketball** — Works for any football or basketball match on Flashscore
@@ -41,7 +41,7 @@ Power odds tickers, matchup preview articles, and editorial content with live bo
 |-----------|------|----------|---------|-------------|
 | `startUrls` | array | Conditional | — | Flashscore match page URLs. Required if `matchIds` is not provided. Example: `https://www.flashscore.com/match/football/arsenal-west-ham/8Cxbx9Wh/` |
 | `matchIds` | array | Conditional | — | Flashscore match IDs (e.g. `["8Cxbx9Wh", "8r8XHz43"]`). These are the same IDs in the `match_id` field of [Flashscore Extractor](https://apify.com/extractify-labs/flashscore-extractor) output. Either `startUrls` or `matchIds` must be provided. |
-| `oddsType` | string | No | `prematch` | Which odds to return: `prematch` (current and opening pre-match lines), `live` (in-play prices, available only while a match is being played), or `both` (each market returned twice, tagged by `odds_type`). |
+| `oddsType` | string | No | `both` | Which odds to return. `both` (the default) returns the pre-match lines plus, while a match is being played, the in-play prices — every market tagged with `odds_type`. `prematch` returns only pre-match lines; `live` returns only in-play prices, which exist only during a match. |
 | `betTypes` | array | No | all types | Filter results to specific bet types. **Bet types differ by sport** — football publishes `HOME_DRAW_AWAY`, `OVER_UNDER`, `BOTH_TEAMS_TO_SCORE`, `DOUBLE_CHANCE`; basketball publishes `HOME_DRAW_AWAY`, `HOME_AWAY`, `OVER_UNDER`, `ASIAN_HANDICAP`. `DRAW_NO_BET` and `EUROPEAN_HANDICAP` are accepted but rarely published. Filtering a match to only bet types it does not offer returns that match with no odds, so omit this to return every market the match publishes. |
 | `maxItems` | integer | No | unlimited | Maximum number of match items to return. Each match is one item. |
 
@@ -70,7 +70,15 @@ Using match IDs (from Flashscore Extractor output):
 }
 ```
 
-Live in-play odds for a match being played right now:
+A default run needs no `oddsType` at all — it returns pre-match odds plus live in-play odds when the match is being played:
+
+```json
+{
+  "matchIds": ["8Cxbx9Wh"]
+}
+```
+
+To narrow it to one feed, for example only in-play prices:
 
 ```json
 {
@@ -107,7 +115,7 @@ One item per match. Each item contains top-level match metadata and a `bookmaker
 |-------|------|---------|-------|
 | `bet_type` | string | `"HOME_DRAW_AWAY"` | Bet type category (see Input Parameters for full list) |
 | `bet_scope` | string | `"FULL_TIME"` | Match period the market covers. `FULL_TIME` is the only scope observed in practice for football and basketball. |
-| `odds_type` | string | `"LIVE"` | Which feed this market came from: `PREMATCH` or `LIVE`. |
+| `odds_type` | string | `"LIVE"` | Which feed this market came from: `PREMATCH` or `LIVE`. With the default `oddsType: "both"`, a match in play returns the same `bet_type` twice — once per feed — so key on `odds_type` as well as `bet_type`. |
 | `has_live_betting` | boolean | `true` | Whether this bookmaker takes in-play bets on this match. Describes the bookmaker, not the prices — see `odds_type` for the feed a market came from. |
 | `odds` | array | — | Array of odds objects (see below) |
 
@@ -234,7 +242,7 @@ No additional URL construction is needed. Team names and match metadata from Fla
 - **No team names in output** — Home team and away team names are not available from the odds API without an additional request per match. To get team names, use [Flashscore Extractor](https://apify.com/extractify-labs/flashscore-extractor) and join on `match_id`. This is a known v1 limitation.
 - **No match date or league name** — Match date/time and competition name are not included in v1 output. Join with Flashscore Extractor output using `match_id` to enrich your dataset.
 - **`sport` absent for `matchIds` input** — When you provide match IDs rather than URLs, the `sport` field is not present in the output (there is no URL to parse the sport from). Use `startUrls` input if you need the sport field, or join with Flashscore Extractor on `match_id`.
-- **Live odds exist only while a match is in play** — With `oddsType: "live"` a match that has not kicked off, or has already finished, returns no live markets; use `prematch` (the default) before and after the match, or `both` to take whatever is available. Bookmaker coverage is also thinner in-play, because some bookmakers withdraw their prices once a match starts.
+- **Live odds exist only while a match is in play** — A match that has not kicked off, or has already finished, returns pre-match markets only. The default (`both`) takes whatever is available, so you never get less than before; `oddsType: "live"` on a match outside play returns no markets at all. Bookmaker coverage is also thinner in-play, because some bookmakers withdraw their prices once a match starts.
 - **Bookmaker availability is geo-fixed** — The bookmakers returned are those available from Apify's server location (European/UK region). This cannot be changed via input parameters.
 - **Football and basketball only** — Other sports available on Flashscore (tennis, hockey, etc.) may work but are not tested or supported in v1.
 - **Point-in-time snapshot** — Each run captures odds at the moment of execution. Live prices move continuously, and the actor does not stream or poll changes. For continuous monitoring or a time series, schedule repeated runs.
@@ -275,7 +283,7 @@ Use the `betTypes` input to filter, but note that filtering a football match to 
 A: The item is still returned, but the `bookmakers` key is **omitted entirely** rather than set to an empty array — so the item contains only `match_id`, `match_url` and `scraped_at`. The actor logs a warning explaining which of these applies, and continues with the remaining matches without raising an error:
 
 - **The `betTypes` filter matched nothing.** Most common cause. The log names what you requested and what the match actually offers. Clear the filter to get every market the match publishes.
-- **`oddsType: "live"` on a match that is not in play.** Live markets exist only during a match; use `prematch` or `both`.
+- **`oddsType: "live"` on a match that is not in play.** Live markets exist only during a match; use the default `both`, or `prematch`.
 - **The region publishes no bookmakers for that match.** The log names the region that was used.
 - **The match ID is invalid, or the match has no odds on Flashscore** — for example a league bookmakers do not cover.
 

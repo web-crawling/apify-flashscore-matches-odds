@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.3 (2026-09-21)
+
+**`oddsType` now defaults to `both`**
+
+- A run with no `oddsType` set now returns the pre-match lines **and**, while a match
+  is being played, the in-play prices. Previously the default was `prematch`, so live
+  odds had to be asked for explicitly.
+- Nothing is removed by this change: the pre-match markets a run returned before are
+  still returned. A match in play simply returns additional markets tagged
+  `odds_type: "LIVE"`.
+- **If you match on `bet_type` alone, key on `odds_type` as well.** During a live
+  match the same `bet_type` now appears once per feed. Set `oddsType: "prematch"` to
+  restore exactly the previous behaviour.
+
 ## v1.2 (2026-09-21)
 
 **Live in-play odds**

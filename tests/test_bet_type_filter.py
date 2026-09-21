@@ -323,12 +323,32 @@ def test_both_feeds_interleaved_emit_exactly_one_item() -> None:
           f"{sum(1 for b in bookmakers for m in b['markets'])} markets")
 
 
-def test_prematch_only_is_unchanged_by_default() -> None:
-    print("\n[14] default (no oddsType) still reads pre-match only")
+def test_prematch_only_when_requested() -> None:
+    print("\n[14] oddsType=prematch reads only the pre-match menu")
     spider, menu_reqs = make_spider(None)
     check("one menu request", len(menu_reqs) == 1, f"got {len(menu_reqs)}")
     check("it is the pre-match menu", "_hash=pobtm" in menu_reqs[0].url, menu_reqs[0].url)
-    check("spider defaults to PREMATCH", spider._odds_types == [PREMATCH], str(spider._odds_types))
+    check("spider reads PREMATCH only", spider._odds_types == [PREMATCH], str(spider._odds_types))
+
+
+def test_default_odds_type_is_both_everywhere() -> None:
+    """The Console default and the code default must not drift apart."""
+    print("\n[15] the documented default and the code default agree")
+    schema = json.loads((Path(__file__).parent.parent / ".actor" / "input_schema.json")
+                        .read_text(encoding="utf-8"))
+    odds_type = schema["properties"]["oddsType"]
+    from src.main import DEFAULT_ODDS_TYPE, ODDS_TYPE_FEEDS
+
+    check("input schema defaults to 'both'", odds_type["default"] == "both", odds_type["default"])
+    check("main.py defaults to 'both'", DEFAULT_ODDS_TYPE == "both", DEFAULT_ODDS_TYPE)
+    check("schema and code agree", odds_type["default"] == DEFAULT_ODDS_TYPE)
+    check("'both' maps to both feeds",
+          ODDS_TYPE_FEEDS[DEFAULT_ODDS_TYPE] == [PREMATCH, LIVE],
+          str(ODDS_TYPE_FEEDS[DEFAULT_ODDS_TYPE]))
+    check("every enum value is mapped", set(odds_type["enum"]) == set(ODDS_TYPE_FEEDS),
+          f'{odds_type["enum"]} vs {sorted(ODDS_TYPE_FEEDS)}')
+    check("the default returns no less than prematch alone",
+          set(ODDS_TYPE_FEEDS["prematch"]) <= set(ODDS_TYPE_FEEDS[DEFAULT_ODDS_TYPE]))
 
 
 def main() -> int:
@@ -346,7 +366,8 @@ def main() -> int:
         test_every_live_shape_parses,
         test_price_movement_is_captured_differentially,
         test_both_feeds_interleaved_emit_exactly_one_item,
-        test_prematch_only_is_unchanged_by_default,
+        test_prematch_only_when_requested,
+        test_default_odds_type_is_both_everywhere,
     ):
         test()
 

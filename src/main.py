@@ -36,13 +36,15 @@ KNOWN_BET_TYPES = frozenset({
     'NEXT_GOAL',
 })
 
-# oddsType input -> the feeds the spider reads. Default stays pre-match only so
-# existing runs keep returning exactly what they returned before.
+# oddsType input -> the feeds the spider reads. The default reads both, so a run
+# returns everything the match publishes: pre-match lines always, plus in-play
+# prices while it is being played. Each market carries odds_type to tell them apart.
 ODDS_TYPE_FEEDS = {
     'prematch': ['PREMATCH'],
     'live': ['LIVE'],
     'both': ['PREMATCH', 'LIVE'],
 }
+DEFAULT_ODDS_TYPE = 'both'
 
 
 def _extract_event_id_from_url(url: str) -> str | None:
@@ -77,24 +79,24 @@ async def main() -> None:
         bet_types: list = actor_input.get('betTypes') or []
         max_items: int | None = actor_input.get('maxItems')
 
-        odds_type: str = str(actor_input.get('oddsType') or 'prematch').strip().lower()
+        odds_type: str = str(actor_input.get('oddsType') or DEFAULT_ODDS_TYPE).strip().lower()
         if odds_type not in ODDS_TYPE_FEEDS:
             Actor.log.warning(
-                f'Unknown oddsType {odds_type!r}; falling back to "prematch". '
+                f'Unknown oddsType {odds_type!r}; falling back to "{DEFAULT_ODDS_TYPE}". '
                 f'Valid values: {sorted(ODDS_TYPE_FEEDS)}.'
             )
-            odds_type = 'prematch'
+            odds_type = DEFAULT_ODDS_TYPE
         feeds = ODDS_TYPE_FEEDS[odds_type]
         if odds_type == 'prematch':
             Actor.log.info(
-                'Reading pre-match odds (current and opening lines). Set oddsType to "live" '
-                'or "both" for in-play prices, which exist only while a match is being played.'
+                'Reading pre-match odds only (current and opening lines). Set oddsType to '
+                '"both" to also get in-play prices while a match is being played.'
             )
         else:
             Actor.log.info(
                 f'Reading {" and ".join(f.lower() for f in feeds)} odds. Live odds exist only '
-                f'while a match is in play; a match that has not started or has finished '
-                f'returns no live markets.'
+                f'while a match is in play, so a match that has not started or has finished '
+                f'returns no live markets; every market carries odds_type.'
             )
 
         # Warn on bet types that can never match, so a filter typo does not look
