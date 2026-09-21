@@ -13,7 +13,7 @@ Extract pre-match and live in-play betting odds from Flashscore for football and
 - **Bet type filter** — Limit output to specific bet types to reduce data volume and cost
 - **Structured JSON output** — Nested bookmakers → markets → odds hierarchy, suitable for direct database ingestion
 - **No proxy required** — Communicates directly with Flashscore's odds API; no residential proxy costs
-- **$1 per 1,000 results** — Pay-per-result billing; one result = one match item
+- **$5 per 1,000 results** — Pay-per-event billing at $0.005 per result; one result = one match item, however many bookmakers and markets it contains
 
 ## Use Cases
 
@@ -70,6 +70,15 @@ Using match IDs (from Flashscore Extractor output):
 }
 ```
 
+Live in-play odds for a match being played right now:
+
+```json
+{
+  "matchIds": ["8Cxbx9Wh"],
+  "oddsType": "live"
+}
+```
+
 ## Output Format
 
 One item per match. Each item contains top-level match metadata and a `bookmakers` array with nested markets and odds.
@@ -97,7 +106,7 @@ One item per match. Each item contains top-level match metadata and a `bookmaker
 | Field | Type | Example | Notes |
 |-------|------|---------|-------|
 | `bet_type` | string | `"HOME_DRAW_AWAY"` | Bet type category (see Input Parameters for full list) |
-| `bet_scope` | string | `"FULL_TIME"` | Match period the market covers: `FULL_TIME` = 90 minutes; `FULL_TIME_OVER_TIME` = includes extra time |
+| `bet_scope` | string | `"FULL_TIME"` | Match period the market covers. `FULL_TIME` is the only scope observed in practice for football and basketball. |
 | `odds_type` | string | `"LIVE"` | Which feed this market came from: `PREMATCH` or `LIVE`. |
 | `has_live_betting` | boolean | `true` | Whether this bookmaker takes in-play bets on this match. Describes the bookmaker, not the prices — see `odds_type` for the feed a market came from. |
 | `odds` | array | — | Array of odds objects (see below) |
@@ -106,11 +115,13 @@ One item per match. Each item contains top-level match metadata and a `bookmaker
 
 | Field | Type | Example | Notes |
 |-------|------|---------|-------|
-| `selection` | string | `"HOME"`, `"DRAW"`, `"AWAY"`, `"OVER"`, `"UNDER"` | Outcome label |
+| `selection` | string | `"HOME"` | Outcome label. One of `HOME`, `DRAW`, `AWAY` (1X2), `OVER`, `UNDER` (totals and handicaps), `YES`, `NO` (both teams to score), `HOME_OR_DRAW`, `AWAY_OR_DRAW`, `NO_DRAW` (double chance), or `NONE` (next goal — meaning no further goal). |
 | `odds` | float | `2.1` | Current decimal odds |
 | `opening_odds` | float or null | `2.25` | Opening line at market open; null if not available |
+| `previous_odds` | float or null | `2.25` | The price immediately before the most recent move; null until the price has moved |
+| `change_direction` | string or null | `"DOWN"` | Direction of the most recent move, `UP` or `DOWN`; null until the price has moved |
 | `handicap` | float or null | `2.5` | Handicap value for OVER_UNDER and ASIAN_HANDICAP bets; null for all other bet types |
-| `is_active` | boolean | `true` | Whether odds are currently live |
+| `is_active` | boolean | `true` | Whether the selection is currently tradeable. `false` means the bookmaker has suspended it — common in-play. |
 
 ### Example Output
 
@@ -126,6 +137,7 @@ One item per match. Each item contains top-level match metadata and a `bookmaker
       "bookmaker_name": "bet365",
       "markets": [
         {
+          "odds_type": "PREMATCH",
           "bet_type": "HOME_DRAW_AWAY",
           "bet_scope": "FULL_TIME",
           "has_live_betting": false,
@@ -134,6 +146,8 @@ One item per match. Each item contains top-level match metadata and a `bookmaker
               "selection": "HOME",
               "odds": 6.0,
               "opening_odds": 5.5,
+              "previous_odds": 5.5,
+              "change_direction": "UP",
               "handicap": null,
               "is_active": true
             },
@@ -141,6 +155,8 @@ One item per match. Each item contains top-level match metadata and a `bookmaker
               "selection": "DRAW",
               "odds": 4.2,
               "opening_odds": 4.33,
+              "previous_odds": 4.33,
+              "change_direction": "DOWN",
               "handicap": null,
               "is_active": true
             },
@@ -148,12 +164,15 @@ One item per match. Each item contains top-level match metadata and a `bookmaker
               "selection": "AWAY",
               "odds": 1.55,
               "opening_odds": 1.62,
+              "previous_odds": 1.62,
+              "change_direction": "DOWN",
               "handicap": null,
               "is_active": true
             }
           ]
         },
         {
+          "odds_type": "PREMATCH",
           "bet_type": "OVER_UNDER",
           "bet_scope": "FULL_TIME",
           "has_live_betting": false,
@@ -162,6 +181,8 @@ One item per match. Each item contains top-level match metadata and a `bookmaker
               "selection": "OVER",
               "odds": 1.87,
               "opening_odds": 1.9,
+              "previous_odds": 1.9,
+              "change_direction": "DOWN",
               "handicap": 2.5,
               "is_active": true
             },
@@ -169,6 +190,8 @@ One item per match. Each item contains top-level match metadata and a `bookmaker
               "selection": "UNDER",
               "odds": 1.87,
               "opening_odds": 1.85,
+              "previous_odds": 1.85,
+              "change_direction": "UP",
               "handicap": 2.5,
               "is_active": true
             }
@@ -176,6 +199,22 @@ One item per match. Each item contains top-level match metadata and a `bookmaker
         }
       ]
     }
+  ]
+}
+```
+
+With `oddsType: "live"`, markets are tagged `LIVE` and include in-play-only markets:
+
+```json
+{
+  "odds_type": "LIVE",
+  "bet_type": "NEXT_GOAL",
+  "bet_scope": "FULL_TIME",
+  "has_live_betting": true,
+  "odds": [
+    { "selection": "HOME", "odds": 1.5, "opening_odds": 1.15, "previous_odds": 1.15, "change_direction": "UP", "handicap": null, "is_active": true },
+    { "selection": "NONE", "odds": 3.5, "opening_odds": 26.0, "previous_odds": 26.0, "change_direction": "DOWN", "handicap": null, "is_active": true },
+    { "selection": "AWAY", "odds": 5.5, "opening_odds": 5.25, "previous_odds": 5.25, "change_direction": "UP", "handicap": null, "is_active": true }
   ]
 }
 ```
@@ -196,10 +235,9 @@ No additional URL construction is needed. Team names and match metadata from Fla
 - **No match date or league name** — Match date/time and competition name are not included in v1 output. Join with Flashscore Extractor output using `match_id` to enrich your dataset.
 - **`sport` absent for `matchIds` input** — When you provide match IDs rather than URLs, the `sport` field is not present in the output (there is no URL to parse the sport from). Use `startUrls` input if you need the sport field, or join with Flashscore Extractor on `match_id`.
 - **Live odds exist only while a match is in play** — With `oddsType: "live"` a match that has not kicked off, or has already finished, returns no live markets; use `prematch` (the default) before and after the match, or `both` to take whatever is available. Bookmaker coverage is also thinner in-play, because some bookmakers withdraw their prices once a match starts.
-- **Each run is a snapshot** — Live prices move continuously. A run captures them at the moment it executes; schedule runs to build a time series.
 - **Bookmaker availability is geo-fixed** — The bookmakers returned are those available from Apify's server location (European/UK region). This cannot be changed via input parameters.
 - **Football and basketball only** — Other sports available on Flashscore (tennis, hockey, etc.) may work but are not tested or supported in v1.
-- **Point-in-time snapshot** — Each run captures odds at the moment of execution. The actor does not stream or poll odds changes. For continuous monitoring, schedule repeated runs.
+- **Point-in-time snapshot** — Each run captures odds at the moment of execution. Live prices move continuously, and the actor does not stream or poll changes. For continuous monitoring or a time series, schedule repeated runs.
 - **No historical odds** — Odds from completed matches are not retained after the match ends. Archive your results if you need historical data.
 
 ## FAQ
@@ -234,7 +272,12 @@ Use the `betTypes` input to filter, but note that filtering a football match to 
 
 **Q: One of my match IDs returned an empty `bookmakers` array. Why?**
 
-A: If a match ID is invalid or the match has no odds data on Flashscore (for example, the match has not opened for betting, or it is from a league that bookmakers do not cover), the actor returns an item with `bookmakers: []` and continues processing remaining matches. No error is raised and the actor does not stop.
+A: The item is still returned, but the `bookmakers` key is **omitted entirely** rather than set to an empty array — so the item contains only `match_id`, `match_url` and `scraped_at`. The actor logs a warning explaining which of these applies, and continues with the remaining matches without raising an error:
+
+- **The `betTypes` filter matched nothing.** Most common cause. The log names what you requested and what the match actually offers. Clear the filter to get every market the match publishes.
+- **`oddsType: "live"` on a match that is not in play.** Live markets exist only during a match; use `prematch` or `both`.
+- **The region publishes no bookmakers for that match.** The log names the region that was used.
+- **The match ID is invalid, or the match has no odds on Flashscore** — for example a league bookmakers do not cover.
 
 ## Related Actors
 

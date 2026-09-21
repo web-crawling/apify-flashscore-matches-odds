@@ -15,6 +15,11 @@
 - Every selection now carries `change_direction` (`UP`/`DOWN`) and `previous_odds`,
   the latest price move and the price it moved from. Both feeds publish this; it is
   null until a price moves. This is the data the line-movement use case needs.
+- Documentation corrected: the price is $0.005 per result ($5 per 1,000), previously
+  stated as $1 per 1,000; the output tables and examples now include `odds_type`,
+  `previous_odds` and `change_direction`; and the "empty result" FAQ now describes
+  what actually happens - the `bookmakers` key is omitted rather than returned as an
+  empty array, with a log line naming which cause applies.
 
 ## v1.1 (2026-09-21)
 
