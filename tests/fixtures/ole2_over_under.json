@@ -1,0 +1,53 @@
+{
+  "data": {
+    "findLiveOddsForBookmaker": {
+      "__typename": "EventLiveOddsOverview",
+      "shouldUpdate": true,
+      "subscriptionSubjects": {
+        "__typename": "SubscriptionSubjects",
+        "updateLiveOddsByBookmakerSubscriptionSubjects": [
+          "/fsds/changes/dlo2/event/liveodds/bXGCB6bl/21/OVER_UNDER/FULL_TIME"
+        ]
+      },
+      "eventOddsOverview": {
+        "__typename": "EventOddsOverviewOverUnder",
+        "bookmakerId": 21,
+        "type": "OVER_UNDER",
+        "opportunities": [
+          {
+            "__typename": "EventOddsOverviewOverUnderOpportunity",
+            "over": {
+              "__typename": "EventOddsOverviewItem",
+              "value": "2.2",
+              "opening": "1.5",
+              "active": true,
+              "eventParticipantId": null,
+              "change": {
+                "__typename": "EventOddsItemChange",
+                "type": "UP",
+                "previous": "1.5"
+              }
+            },
+            "under": {
+              "__typename": "EventOddsOverviewItem",
+              "value": "1.62",
+              "opening": "2.5",
+              "active": true,
+              "eventParticipantId": null,
+              "change": {
+                "__typename": "EventOddsItemChange",
+                "type": "DOWN",
+                "previous": "2.5"
+              }
+            },
+            "handicap": {
+              "__typename": "EventOddsItemHandicap",
+              "value": "1.5",
+              "type": "UNKNOWN"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

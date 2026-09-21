@@ -21,12 +21,50 @@
 			"description": "Flashscore match IDs to extract odds for (alternative to startUrls). These are the same match_id values output by the flashscore-extractor actor. Either startUrls or matchIds must be provided.",
 			"default": []
 		},
+		"oddsType": {
+			"title": "Odds Type",
+			"type": "string",
+			"editor": "select",
+			"description": "Which odds to return. 'Pre-match' returns the current and opening pre-match lines (the default, and the only odds available before a match starts). 'Live' returns in-play prices that move during the match, including price movement and in-play-only markets such as next goal — available only while a match is actually being played. 'Both' returns each market twice, tagged by odds_type.",
+			"default": "prematch",
+			"enum": ["prematch", "live", "both"],
+			"enumTitles": [
+				"Pre-match odds (default)",
+				"Live in-play odds",
+				"Both pre-match and live"
+			]
+		},
 		"betTypes": {
 			"title": "Bet Types",
 			"type": "array",
-			"editor": "stringList",
-			"description": "Filter which bet types to include. Valid values: HOME_DRAW_AWAY (football 1X2), HOME_AWAY (two-way, e.g. basketball), OVER_UNDER (totals), ASIAN_HANDICAP (spread), DRAW_NO_BET, DOUBLE_CHANCE, EUROPEAN_HANDICAP, BOTH_TEAMS_TO_SCORE. Leave empty to include all bet types.",
-			"default": []
+			"editor": "select",
+			"description": "Filter which bet types to include. Bet types differ by sport: football matches offer HOME_DRAW_AWAY, OVER_UNDER, BOTH_TEAMS_TO_SCORE and DOUBLE_CHANCE; basketball matches offer HOME_DRAW_AWAY, HOME_AWAY, OVER_UNDER and ASIAN_HANDICAP. Selecting only bet types the match does not offer returns a match with no odds, so leave this empty (the default) to get every market the match publishes.",
+			"default": [],
+			"items": {
+				"type": "string",
+				"enum": [
+					"HOME_DRAW_AWAY",
+					"OVER_UNDER",
+					"BOTH_TEAMS_TO_SCORE",
+					"DOUBLE_CHANCE",
+					"HOME_AWAY",
+					"ASIAN_HANDICAP",
+					"DRAW_NO_BET",
+					"EUROPEAN_HANDICAP",
+					"NEXT_GOAL"
+				],
+				"enumTitles": [
+					"1X2 / Home-Draw-Away (football + basketball)",
+					"Over/Under totals (football + basketball)",
+					"Both teams to score (football)",
+					"Double chance (football)",
+					"Home-Away two-way (basketball)",
+					"Asian handicap (basketball)",
+					"Draw no bet (rarely published)",
+					"European handicap (rarely published)",
+					"Next goal (live odds only)"
+				]
+			}
 		},
 		"maxItems": {
 			"title": "Maximum Items",

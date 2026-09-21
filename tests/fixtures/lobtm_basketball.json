@@ -1,0 +1,112 @@
+{
+  "data": {
+    "getLiveOddsBettingTypeMenu": {
+      "__typename": "OddsTypeMenu",
+      "settings": {
+        "__typename": "ProjectBookmakerGroup",
+        "clickable": 1,
+        "clickableBookmakerLogoInSummary": 1,
+        "logoToTextMatchSummary": 0,
+        "showBookmakerLogoInSummary": 1,
+        "bookmakers": [
+          {
+            "__typename": "ProjectBookmaker",
+            "bookmaker": {
+              "__typename": "Bookmaker",
+              "id": 16,
+              "name": "bet365",
+              "bonusTextColor": "FFFFFF",
+              "bonusBackgroundColor": "017B5B",
+              "bonusButtonTextColor": "000000",
+              "bonusButtonBackgroundColor": "FBE144"
+            },
+            "numOrder": 1,
+            "premiumStatusId": 1,
+            "betslipPrematchOddsStatusId": 1,
+            "linkPrematchOddsType": 2
+          },
+          {
+            "__typename": "ProjectBookmaker",
+            "bookmaker": {
+              "__typename": "Bookmaker",
+              "id": 1281,
+              "name": "BetMGM.uk",
+              "bonusTextColor": "ffffff",
+              "bonusBackgroundColor": "222222",
+              "bonusButtonTextColor": "222222",
+              "bonusButtonBackgroundColor": "ffffff"
+            },
+            "numOrder": 2,
+            "premiumStatusId": 1,
+            "betslipPrematchOddsStatusId": 2,
+            "linkPrematchOddsType": 0
+          }
+        ],
+        "showAllBookmakers": true
+      },
+      "bonuses": [],
+      "items": [
+        {
+          "__typename": "OddsTypeMenuItem",
+          "bookmakerIds": [
+            16,
+            1281
+          ],
+          "isActive": true,
+          "isDefault": false,
+          "bettingType": "HOME_DRAW_AWAY",
+          "bettingScope": "FULL_TIME",
+          "types": [
+            "LIVE",
+            "PREMATCH"
+          ]
+        },
+        {
+          "__typename": "OddsTypeMenuItem",
+          "bookmakerIds": [
+            16,
+            1281
+          ],
+          "isActive": true,
+          "isDefault": true,
+          "bettingType": "HOME_AWAY",
+          "bettingScope": "FULL_TIME_OVER_TIME",
+          "types": [
+            "LIVE",
+            "PREMATCH"
+          ]
+        },
+        {
+          "__typename": "OddsTypeMenuItem",
+          "bookmakerIds": [
+            16,
+            1281
+          ],
+          "isActive": true,
+          "isDefault": false,
+          "bettingType": "OVER_UNDER",
+          "bettingScope": "FULL_TIME_OVER_TIME",
+          "types": [
+            "LIVE",
+            "PREMATCH"
+          ]
+        },
+        {
+          "__typename": "OddsTypeMenuItem",
+          "bookmakerIds": [
+            16,
+            1281
+          ],
+          "isActive": true,
+          "isDefault": false,
+          "bettingType": "ASIAN_HANDICAP",
+          "bettingScope": "FULL_TIME_OVER_TIME",
+          "types": [
+            "LIVE",
+            "PREMATCH"
+          ]
+        }
+      ]
+    }
+  }
+}

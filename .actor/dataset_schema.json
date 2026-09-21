@@ -47,6 +47,10 @@
 						"items": {
 							"type": "object",
 							"properties": {
+								"odds_type": {
+									"type": "string",
+									"description": "Which feed this market came from: PREMATCH (current and opening pre-match lines) or LIVE (in-play prices). Present on every market; a run with oddsType=both returns both for the same market."
+								},
 								"bet_type": {
 									"type": "string",
 									"description": "Betting type (HOME_DRAW_AWAY, HOME_AWAY, OVER_UNDER, etc.)"
@@ -57,7 +61,7 @@
 								},
 								"has_live_betting": {
 									"type": "boolean",
-									"description": "Whether live betting is available for this market"
+									"description": "Whether this bookmaker takes in-play bets on this match: taken from the pre-match menu flag, and always true for a bookmaker that appears in the live odds menu. Identical across that bookmaker's markets. It describes the bookmaker, not the prices — see odds_type for which feed a market came from."
 								},
 								"odds": {
 									"type": "array",
@@ -67,7 +71,7 @@
 										"properties": {
 											"selection": {
 												"type": "string",
-												"description": "Outcome selection (HOME, DRAW, AWAY, OVER, UNDER)"
+												"description": "Outcome selection: HOME, DRAW, AWAY, OVER, UNDER, YES, NO, HOME_OR_DRAW, AWAY_OR_DRAW, NO_DRAW, or NONE (next-goal markets, meaning no further goal)"
 											},
 											"odds": {
 												"type": "number",
@@ -76,6 +80,14 @@
 											"opening_odds": {
 												"type": "number",
 												"description": "Opening odds at market open"
+											},
+											"previous_odds": {
+												"type": "number",
+												"description": "The price immediately before the most recent change. Published on both feeds; null when the price has not moved since it opened."
+											},
+											"change_direction": {
+												"type": "string",
+												"description": "Direction of the most recent price move, UP or DOWN. Published on both feeds; null when the price has not moved since it opened."
 											},
 											"handicap": {
 												"type": "number",

@@ -21,6 +21,29 @@ from scrapy.utils.defer import deferred_to_future
 
 from .spiders.flashscore_odds import FlashscoreOddsSpider
 
+# Bet types the Flashscore odds menu can publish. Which of them a given match
+# actually offers depends on its sport, so a value being valid here does NOT
+# mean every match has it (see the betTypes description in INPUT_SCHEMA).
+KNOWN_BET_TYPES = frozenset({
+    'HOME_DRAW_AWAY',
+    'HOME_AWAY',
+    'OVER_UNDER',
+    'ASIAN_HANDICAP',
+    'DRAW_NO_BET',
+    'DOUBLE_CHANCE',
+    'EUROPEAN_HANDICAP',
+    'BOTH_TEAMS_TO_SCORE',
+    'NEXT_GOAL',
+})
+
+# oddsType input -> the feeds the spider reads. Default stays pre-match only so
+# existing runs keep returning exactly what they returned before.
+ODDS_TYPE_FEEDS = {
+    'prematch': ['PREMATCH'],
+    'live': ['LIVE'],
+    'both': ['PREMATCH', 'LIVE'],
+}
+
 
 def _extract_event_id_from_url(url: str) -> str | None:
     """Return the event ID embedded in a Flashscore match URL.
@@ -54,6 +77,42 @@ async def main() -> None:
         bet_types: list = actor_input.get('betTypes') or []
         max_items: int | None = actor_input.get('maxItems')
 
+        odds_type: str = str(actor_input.get('oddsType') or 'prematch').strip().lower()
+        if odds_type not in ODDS_TYPE_FEEDS:
+            Actor.log.warning(
+                f'Unknown oddsType {odds_type!r}; falling back to "prematch". '
+                f'Valid values: {sorted(ODDS_TYPE_FEEDS)}.'
+            )
+            odds_type = 'prematch'
+        feeds = ODDS_TYPE_FEEDS[odds_type]
+        if odds_type == 'prematch':
+            Actor.log.info(
+                'Reading pre-match odds (current and opening lines). Set oddsType to "live" '
+                'or "both" for in-play prices, which exist only while a match is being played.'
+            )
+        else:
+            Actor.log.info(
+                f'Reading {" and ".join(f.lower() for f in feeds)} odds. Live odds exist only '
+                f'while a match is in play; a match that has not started or has finished '
+                f'returns no live markets.'
+            )
+
+        # Warn on bet types that can never match, so a filter typo does not look
+        # like "this match has no odds".
+        unknown_bet_types = [b for b in bet_types if b not in KNOWN_BET_TYPES]
+        if unknown_bet_types:
+            Actor.log.warning(
+                f'Unknown betTypes {sorted(unknown_bet_types)} will never match any market. '
+                f'Valid values: {sorted(KNOWN_BET_TYPES)}.'
+            )
+        if bet_types:
+            Actor.log.info(
+                f'Filtering to bet types {sorted(set(bet_types))}. Bet types differ by sport '
+                f'(football: HOME_DRAW_AWAY, OVER_UNDER, BOTH_TEAMS_TO_SCORE, DOUBLE_CHANCE; '
+                f'basketball: HOME_DRAW_AWAY, HOME_AWAY, OVER_UNDER, ASIAN_HANDICAP); '
+                f'a match offering none of them returns no odds.'
+            )
+
         # Validation: at least one of startUrls or matchIds must be provided.
         if not start_urls and not match_ids:
             await Actor.fail(
@@ -73,7 +132,7 @@ async def main() -> None:
                 continue
             event_id = _extract_event_id_from_url(url)
             if not event_id:
-                Actor.log.warning(f'Could not extract event ID from URL: {url!r} — skipping')
+                Actor.log.warning(f'Could not extract event ID from URL: {url!r} - skipping')
                 continue
             if event_id not in seen:
                 seen[event_id] = url  # preserve original URL as match_url
@@ -103,6 +162,7 @@ async def main() -> None:
         settings.set('ODDS_REQUESTS', odds_requests)
         # BET_TYPES_FILTER: pass a set (or None) so the spider can use `in` checks efficiently.
         settings.set('BET_TYPES_FILTER', set(bet_types) if bet_types else None)
+        settings.set('ODDS_TYPES', feeds)
 
         # Apply the maxItems cap via Scrapy's CLOSESPIDER_ITEMCOUNT.
         if max_items:

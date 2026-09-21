@@ -1,3 +1,9 @@
 apify[scrapy]
+# crawlee 1.10.1 made try_import()'s `extra_name` keyword-only argument required,
+# which apify 4.0.2's apify/scrapy/__init__.py does not pass -- importing
+# apify.scrapy then raises TypeError and the Actor cannot start. apify allows
+# crawlee<2.0.0, so an unpinned build picks the broken version. Drop this pin once
+# apify releases a version compatible with crawlee >= 1.10.1.
+crawlee<1.10.1
 scrapy
 demjson3

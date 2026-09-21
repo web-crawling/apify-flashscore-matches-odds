@@ -1,0 +1,55 @@
+{
+  "data": {
+    "findLiveOddsForBookmaker": {
+      "__typename": "EventLiveOddsOverview",
+      "shouldUpdate": true,
+      "subscriptionSubjects": {
+        "__typename": "SubscriptionSubjects",
+        "updateLiveOddsByBookmakerSubscriptionSubjects": [
+          "/fsds/changes/dlo2/event/liveodds/bXGCB6bl/895/NEXT_GOAL/FULL_TIME"
+        ]
+      },
+      "eventOddsOverview": {
+        "__typename": "EventOddsOverviewNextGoal",
+        "bookmakerId": 895,
+        "type": "NEXT_GOAL",
+        "home": {
+          "__typename": "EventOddsOverviewItem",
+          "value": "2.63",
+          "opening": "2.45",
+          "active": true,
+          "eventParticipantId": "lEw3sjMh",
+          "change": {
+            "__typename": "EventOddsItemChange",
+            "type": "UP",
+            "previous": "2.45"
+          }
+        },
+        "none": {
+          "__typename": "EventOddsOverviewItem",
+          "value": "3.8",
+          "opening": "5.5",
+          "active": true,
+          "eventParticipantId": null,
+          "change": {
+            "__typename": "EventOddsItemChange",
+            "type": "DOWN",
+            "previous": "5.5"
+          }
+        },
+        "away": {
+          "__typename": "EventOddsOverviewItem",
+          "value": "1.93",
+          "opening": "1.7",
+          "active": true,
+          "eventParticipantId": "MRyBuUj5",
+          "change": {
+            "__typename": "EventOddsItemChange",
+            "type": "UP",
+            "previous": "1.7"
+          }
+        }
+      }
+    }
+  }
+}

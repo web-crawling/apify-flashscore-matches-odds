@@ -1,0 +1,53 @@
+{
+  "data": {
+    "findLiveOddsForBookmaker": {
+      "__typename": "EventLiveOddsOverview",
+      "shouldUpdate": true,
+      "subscriptionSubjects": {
+        "__typename": "SubscriptionSubjects",
+        "updateLiveOddsByBookmakerSubscriptionSubjects": [
+          "/fsds/changes/dlo2/event/liveodds/bXGCB6bl/895/ASIAN_HANDICAP/FULL_TIME"
+        ]
+      },
+      "eventOddsOverview": {
+        "__typename": "EventOddsOverviewAsianHandicap",
+        "bookmakerId": 895,
+        "type": "ASIAN_HANDICAP",
+        "opportunities": [
+          {
+            "__typename": "EventOddsOverviewAsianHandicapOpportunity",
+            "home": {
+              "__typename": "EventOddsOverviewItem",
+              "value": "1.46",
+              "opening": "1.6",
+              "active": true,
+              "eventParticipantId": "lEw3sjMh",
+              "change": {
+                "__typename": "EventOddsItemChange",
+                "type": "DOWN",
+                "previous": "1.6"
+              }
+            },
+            "away": {
+              "__typename": "EventOddsOverviewItem",
+              "value": "2.3",
+              "opening": "2.03",
+              "active": true,
+              "eventParticipantId": "MRyBuUj5",
+              "change": {
+                "__typename": "EventOddsItemChange",
+                "type": "UP",
+                "previous": "2.03"
+              }
+            },
+            "handicap": {
+              "__typename": "EventOddsItemHandicap",
+              "value": "0.5",
+              "type": "UNKNOWN"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

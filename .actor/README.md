@@ -1,12 +1,13 @@
 # Flashscore Betting Odds Extractor
 
-Extract live and opening betting odds from Flashscore for football and basketball matches. Get bookmaker-level odds across multiple bet types — 1X2, over/under, Asian handicap, draw no bet, double chance, and European handicap — in a structured JSON format ready for odds comparison, arbitrage detection, and prediction model pipelines. No proxy required.
+Extract pre-match and live in-play betting odds from Flashscore for football and basketball matches. Get bookmaker-level odds across the bet types each sport publishes — 1X2, over/under, both teams to score, double chance, two-way, Asian handicap and next goal — each with its opening price and latest movement, in a structured JSON format ready for odds comparison, arbitrage detection, and prediction model pipelines. No proxy required.
 
 ## Features
 
 - **Multi-bookmaker odds** — Returns all bookmakers available for each match via the Flashscore odds feed
-- **8 bet types** — HOME_DRAW_AWAY (1X2), HOME_AWAY (two-way), OVER_UNDER, ASIAN_HANDICAP, DRAW_NO_BET, DOUBLE_CHANCE, EUROPEAN_HANDICAP, BOTH_TEAMS_TO_SCORE
-- **Opening odds + live odds** — Both current and opening lines returned per selection, enabling line movement tracking
+- **Pre-match or live in-play odds** — Choose with `oddsType`. Pre-match returns the current and opening line before kick-off; live returns in-play prices that move during the match, including in-play-only markets such as next goal. `both` returns each, tagged by `odds_type`
+- **Bet types by sport and state** — Pre-match football publishes HOME_DRAW_AWAY (1X2), OVER_UNDER, BOTH_TEAMS_TO_SCORE and DOUBLE_CHANCE; pre-match basketball publishes HOME_DRAW_AWAY, HOME_AWAY (two-way), OVER_UNDER and ASIAN_HANDICAP. Live football adds ASIAN_HANDICAP and NEXT_GOAL
+- **Opening price and latest movement** — Every selection carries its opening line plus `change_direction` and `previous_odds`, so you can see which way a price just moved and from where
 - **Football and basketball** — Works for any football or basketball match on Flashscore
 - **Flexible input** — Accept Flashscore match page URLs or raw match IDs (same IDs output by [Flashscore Extractor](https://apify.com/extractify-labs/flashscore-extractor))
 - **Bet type filter** — Limit output to specific bet types to reduce data volume and cost
@@ -40,7 +41,8 @@ Power odds tickers, matchup preview articles, and editorial content with live bo
 |-----------|------|----------|---------|-------------|
 | `startUrls` | array | Conditional | — | Flashscore match page URLs. Required if `matchIds` is not provided. Example: `https://www.flashscore.com/match/football/arsenal-west-ham/8Cxbx9Wh/` |
 | `matchIds` | array | Conditional | — | Flashscore match IDs (e.g. `["8Cxbx9Wh", "8r8XHz43"]`). These are the same IDs in the `match_id` field of [Flashscore Extractor](https://apify.com/extractify-labs/flashscore-extractor) output. Either `startUrls` or `matchIds` must be provided. |
-| `betTypes` | array | No | all types | Filter results to specific bet types. Accepted values: `HOME_DRAW_AWAY`, `HOME_AWAY`, `OVER_UNDER`, `ASIAN_HANDICAP`, `DRAW_NO_BET`, `DOUBLE_CHANCE`, `EUROPEAN_HANDICAP`, `BOTH_TEAMS_TO_SCORE`. Omit to return all available bet types. |
+| `oddsType` | string | No | `prematch` | Which odds to return: `prematch` (current and opening pre-match lines), `live` (in-play prices, available only while a match is being played), or `both` (each market returned twice, tagged by `odds_type`). |
+| `betTypes` | array | No | all types | Filter results to specific bet types. **Bet types differ by sport** — football publishes `HOME_DRAW_AWAY`, `OVER_UNDER`, `BOTH_TEAMS_TO_SCORE`, `DOUBLE_CHANCE`; basketball publishes `HOME_DRAW_AWAY`, `HOME_AWAY`, `OVER_UNDER`, `ASIAN_HANDICAP`. `DRAW_NO_BET` and `EUROPEAN_HANDICAP` are accepted but rarely published. Filtering a match to only bet types it does not offer returns that match with no odds, so omit this to return every market the match publishes. |
 | `maxItems` | integer | No | unlimited | Maximum number of match items to return. Each match is one item. |
 
 > **Note on bookmaker availability:** Bookmakers published for each match depend on the geographic location of the Apify server running the actor. Flashscore validates requests against the actual client IP — this cannot be overridden. When run on Apify's infrastructure, the actor returns bookmakers available in the European/UK region.
@@ -96,7 +98,8 @@ One item per match. Each item contains top-level match metadata and a `bookmaker
 |-------|------|---------|-------|
 | `bet_type` | string | `"HOME_DRAW_AWAY"` | Bet type category (see Input Parameters for full list) |
 | `bet_scope` | string | `"FULL_TIME"` | Match period the market covers: `FULL_TIME` = 90 minutes; `FULL_TIME_OVER_TIME` = includes extra time |
-| `has_live_betting` | boolean | `false` | Whether in-play odds are available for this market. Always `false` in v1 — see Limitations. |
+| `odds_type` | string | `"LIVE"` | Which feed this market came from: `PREMATCH` or `LIVE`. |
+| `has_live_betting` | boolean | `true` | Whether this bookmaker takes in-play bets on this match. Describes the bookmaker, not the prices — see `odds_type` for the feed a market came from. |
 | `odds` | array | — | Array of odds objects (see below) |
 
 ### Odds Object
@@ -192,7 +195,8 @@ No additional URL construction is needed. Team names and match metadata from Fla
 - **No team names in output** — Home team and away team names are not available from the odds API without an additional request per match. To get team names, use [Flashscore Extractor](https://apify.com/extractify-labs/flashscore-extractor) and join on `match_id`. This is a known v1 limitation.
 - **No match date or league name** — Match date/time and competition name are not included in v1 output. Join with Flashscore Extractor output using `match_id` to enrich your dataset.
 - **`sport` absent for `matchIds` input** — When you provide match IDs rather than URLs, the `sport` field is not present in the output (there is no URL to parse the sport from). Use `startUrls` input if you need the sport field, or join with Flashscore Extractor on `match_id`.
-- **`has_live_betting` always `false`** — The current API response does not include in-play betting availability. This field is present in the output schema for forward compatibility and will be populated in a future version.
+- **Live odds exist only while a match is in play** — With `oddsType: "live"` a match that has not kicked off, or has already finished, returns no live markets; use `prematch` (the default) before and after the match, or `both` to take whatever is available. Bookmaker coverage is also thinner in-play, because some bookmakers withdraw their prices once a match starts.
+- **Each run is a snapshot** — Live prices move continuously. A run captures them at the moment it executes; schedule runs to build a time series.
 - **Bookmaker availability is geo-fixed** — The bookmakers returned are those available from Apify's server location (European/UK region). This cannot be changed via input parameters.
 - **Football and basketball only** — Other sports available on Flashscore (tennis, hockey, etc.) may work but are not tested or supported in v1.
 - **Point-in-time snapshot** — Each run captures odds at the moment of execution. The actor does not stream or poll odds changes. For continuous monitoring, schedule repeated runs.
@@ -222,7 +226,11 @@ A: Team names are not available from the odds API endpoint in v1. Run [Flashscor
 
 **Q: What bet types are supported?**
 
-A: Eight bet types are supported: `HOME_DRAW_AWAY` (1X2), `HOME_AWAY` (two-way, common for basketball), `OVER_UNDER`, `ASIAN_HANDICAP`, `DRAW_NO_BET`, `DOUBLE_CHANCE`, `EUROPEAN_HANDICAP`, and `BOTH_TEAMS_TO_SCORE`. The actual types available for a given match depend on what Flashscore bookmakers publish. Use the `betTypes` input parameter to filter to specific types.
+A: Which bet types exist depends on the sport. Football matches publish `HOME_DRAW_AWAY` (1X2), `OVER_UNDER`, `BOTH_TEAMS_TO_SCORE` and `DOUBLE_CHANCE`. Basketball matches publish `HOME_DRAW_AWAY`, `HOME_AWAY` (two-way), `OVER_UNDER` and `ASIAN_HANDICAP`. `DRAW_NO_BET` and `EUROPEAN_HANDICAP` are accepted by the filter and parsed when present, but Flashscore rarely publishes them.
+
+Live football additionally publishes `ASIAN_HANDICAP` and `NEXT_GOAL` (who scores next, with a `NONE` outcome for no further goal). `NEXT_GOAL` exists only in-play.
+
+Use the `betTypes` input to filter, but note that filtering a football match to a basketball-only type such as `ASIAN_HANDICAP` (or vice versa) matches nothing and returns that match with no odds. The run log says so explicitly, naming what you asked for and what the match actually offers. Omit `betTypes` to get everything.
 
 **Q: One of my match IDs returned an empty `bookmakers` array. Why?**
 

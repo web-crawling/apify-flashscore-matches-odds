@@ -1,17 +1,29 @@
 """Spider for fetching match betting odds from Flashscore.
 
-Request flow (revised after API investigation — oce endpoint is no longer active):
+Two parallel feeds, selected by the ``oddsType`` input (see ``ODDS_TYPES``):
 
-1. One GET to flashscore.com homepage → acquires the ``geolocation`` cookie used
-   to build geo-aware ``pobtm`` menu requests.
-2. One ``pobtm`` request per match → returns bookmaker list + available bet types.
-3. One ``ope2`` request per (match × bookmaker × bet_type × bet_scope) → returns
-   the actual odds for that combination.
+* PREMATCH — ``pobtm`` (menu) + ``ope2`` (odds): the current and opening lines a
+  bookmaker published before kick-off. Available whatever state the match is in.
+* LIVE — ``lobtm`` (menu) + ``ole2`` (odds): in-play prices that move during the
+  match, plus in-play-only markets such as NEXT_GOAL. Published only while a match
+  is actually being played.
+
+Request flow (the ``oce`` endpoint referenced by earlier versions is no longer active):
+
+1. One GET to flashscore.com homepage → would supply a ``geolocation`` cookie for
+   geo-aware menu requests. The site no longer sets one, so the GB/GB default is
+   the normal path; the region actually used is logged once per run.
+2. One menu request per match *per selected feed* → bookmaker list + available
+   bet types for that feed.
+3. One odds request per (match × feed × bookmaker × bet_type × bet_scope) → the
+   odds for that combination.
 
 Item assembly: each ``parse_odds`` callback writes into a spider-level dict
-(``_match_store``) keyed by event_id. When the final ope2 response for a match
-arrives, the item is yielded. A counter (``pending``) tracks how many ope2 requests
-are still outstanding for each match.
+(``_match_store``) keyed by event_id, with markets keyed by (feed, bet_type,
+bet_scope) so a live market never overwrites its pre-match twin. Two counters
+decide when a match is done: ``menus_pending`` (menus still to answer) and
+``pending`` (odds requests still outstanding). ``_maybe_finalize`` emits the item
+only when both reach zero, so one feed finishing early cannot cut the other short.
 """
 
 from __future__ import annotations
@@ -40,6 +52,36 @@ OPE2_URL = (
     "?_hash=ope2&eventId={event_id}&bookmakerId={bookmaker_id}"
     "&betType={bet_type}&betScope={bet_scope}"
 )
+
+# Live (in-play) counterparts of the pre-match pair above: same host, same auth
+# (none), same parameters. lobtm lists the live markets, ole2 returns the prices.
+LOBTM_URL = (
+    "https://global.ds.lsapp.eu/odds/pq_graphql"
+    "?_hash=lobtm&eventId={event_id}&projectId=2"
+    "&geoIpCode={geo_code}&geoIpSubdivisionCode={geo_sub}"
+)
+
+OLE2_URL = (
+    "https://global.ds.lsapp.eu/odds/pq_graphql"
+    "?_hash=ole2&eventId={event_id}&bookmakerId={bookmaker_id}"
+    "&betType={bet_type}&betScope={bet_scope}"
+)
+
+PREMATCH = "PREMATCH"
+LIVE = "LIVE"
+
+MENU_URL = {PREMATCH: POBTM_URL, LIVE: LOBTM_URL}
+ODDS_URL = {PREMATCH: OPE2_URL, LIVE: OLE2_URL}
+MENU_PATH = {
+    PREMATCH: "data.getPrematchOddsBettingTypeMenu",
+    LIVE: "data.getLiveOddsBettingTypeMenu",
+}
+# The live feed wraps the odds one level deeper than the pre-match feed, behind
+# push-subscription metadata this Actor does not use.
+ODDS_PATH = {
+    PREMATCH: "data.findPrematchOddsForBookmaker",
+    LIVE: "data.findLiveOddsForBookmaker.eventOddsOverview",
+}
 
 BROWSER_HEADERS = {
     "User-Agent": (
@@ -84,13 +126,19 @@ def _parse_geo_cookie(cookie_value: str) -> tuple[str, str]:
 
 
 def _parse_ope2_odds(fp_data: dict) -> list[dict]:
-    """Convert a ``findPrematchOddsForBookmaker`` dict into a list of odd-row dicts.
+    """Convert an odds-overview dict into a list of odd-row dicts.
 
-    Response structure varies by __typename:
+    Handles both feeds: the pre-match ``findPrematchOddsForBookmaker`` payload and the
+    live ``findLiveOddsForBookmaker.eventOddsOverview`` payload, which share the same
+    ``__typename`` shapes. Structure varies by __typename:
     - HOME_DRAW_AWAY / HOME_AWAY / DRAW_NO_BET  → {home, draw?, away}
     - OVER_UNDER / ASIAN_HANDICAP / EUROPEAN_HANDICAP → {opportunities[{...}]}
     - DOUBLE_CHANCE  → {homeOrDraw, awayOrDraw, noDraw}
     - BOTH_TEAMS_TO_SCORE → {yes, no}
+    - NEXT_GOAL (live only) → {home, none, away}
+
+    Both feeds publish ``change{type,previous}`` per selection, captured as
+    ``change_direction`` / ``previous_odds``; it is null until a price moves.
     """
 
     def _item(sel: str, raw: dict, handicap_dict: dict | None = None) -> dict:
@@ -108,10 +156,17 @@ def _parse_ope2_odds(fp_data: dict) -> list[dict]:
                 hv = float(handicap_dict["value"]) if handicap_dict.get("value") is not None else None
             except (ValueError, TypeError):
                 hv = None
+        change = raw.get("change") or {}
+        try:
+            previous_v = float(change["previous"]) if change.get("previous") is not None else None
+        except (ValueError, TypeError):
+            previous_v = None
         return {
             "selection": sel,
             "odds": odds_v,
             "opening_odds": opening_v,
+            "previous_odds": previous_v,
+            "change_direction": change.get("type"),
             "handicap": hv,
             "is_active": bool(raw.get("active")),
         }
@@ -126,6 +181,12 @@ def _parse_ope2_odds(fp_data: dict) -> list[dict]:
 
     elif typename in ("EventOddsOverviewHomeAway", "EventOddsOverviewDrawNoBet"):
         for sel, key in [("HOME", "home"), ("AWAY", "away")]:
+            if key in fp_data:
+                rows.append(_item(sel, fp_data[key]))
+
+    elif typename == "EventOddsOverviewNextGoal":
+        # Live-only market: who scores the next goal, or nobody ("none").
+        for sel, key in [("HOME", "home"), ("NONE", "none"), ("AWAY", "away")]:
             if key in fp_data:
                 rows.append(_item(sel, fp_data[key]))
 
@@ -165,16 +226,32 @@ class FlashscoreOddsSpider(scrapy.Spider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._bet_types_filter: set[str] | None = None
+        # Which feeds to read: PREMATCH, LIVE, or both.
+        self._odds_types: list[str] = [PREMATCH]
+        # Geo actually used to build the pobtm menu requests. Flashscore publishes a
+        # different bookmaker set per region, so every "no odds" diagnostic names it.
+        self._geo: tuple[str, str] = ("GB", "GB")
         # Per-match accumulator: {event_id: {pending: int, bm_acc: {bm_id: {name, markets}}, ...}}
         self._match_store: dict[str, dict] = {}
 
     async def start(self):
-        """Scrapy 2.13+ async entry point — delegates to start_requests() for compatibility."""
-        async for item in super().start():
-            yield item
+        """Scrapy 2.13+ async entry point.
+
+        Do NOT delegate to ``super().start()``: its default implementation only yields
+        requests built from ``start_urls`` (unused here), and Scrapy 2.19 dropped
+        ``Spider.start_requests()`` altogether — so delegating emits no requests at all.
+        Both entry points therefore share ``_initial_requests()``.
+        """
+        for request in self._initial_requests():
+            yield request
 
     def start_requests(self):
+        """Entry point for Scrapy < 2.13, kept so the spider runs on either version."""
+        return self._initial_requests()
+
+    def _initial_requests(self):
         self._bet_types_filter = self.settings.get("BET_TYPES_FILTER") or None
+        self._odds_types = list(self.settings.get("ODDS_TYPES") or [PREMATCH])
         # Homepage request to pick up the geolocation cookie
         yield scrapy.Request(
             url=FS_HOME,
@@ -195,15 +272,24 @@ class FlashscoreOddsSpider(scrapy.Spider):
                 end = ck_str.find(";", start)
                 raw = ck_str[start:end] if end != -1 else ck_str[start:]
                 geo_code, geo_sub = _parse_geo_cookie(raw)
-                logger.info("geolocation cookie: %s → code=%s sub=%s", raw, geo_code, geo_sub)
+                logger.info("geolocation cookie: %s -> code=%s sub=%s", raw, geo_code, geo_sub)
                 break
         else:
-            logger.warning("geolocation not found in Set-Cookie; using default GB/GB")
+            # flashscore.com sets no geolocation cookie, so this is the normal path,
+            # not a fault. The region actually used is logged at INFO just below.
+            logger.debug("No geolocation cookie in the response; using the default GB/GB region")
 
         yield from self._yield_match_requests(geo_code, geo_sub)
 
     def _yield_match_requests(self, geo_code: str, geo_sub: str):
         """Initialise per-match state and yield one pobtm request per match."""
+        self._geo = (geo_code, geo_sub)
+        logger.info(
+            "Odds region: geoIpCode=%s geoIpSubdivisionCode=%s "
+            "(the bookmakers Flashscore publishes depend on this region)",
+            geo_code, geo_sub,
+        )
+        logger.info("Reading %s odds", " + ".join(t.lower() for t in self._odds_types))
         odds_requests = self.settings.get("ODDS_REQUESTS", [])
         for req_info in odds_requests:
             event_id = req_info["event_id"]
@@ -215,50 +301,71 @@ class FlashscoreOddsSpider(scrapy.Spider):
                 "sport": sport,
                 "bm_acc": {},
                 "pending": 0,
+                "menus_pending": len(self._odds_types),
             }
-            url = POBTM_URL.format(event_id=event_id, geo_code=geo_code, geo_sub=geo_sub)
-            yield scrapy.Request(
-                url=url,
-                callback=self.parse_menu,
-                errback=self.errback_menu,
-                headers=BROWSER_HEADERS,
-                cb_kwargs={"event_id": event_id},
-                dont_filter=True,
-            )
+            for odds_type in self._odds_types:
+                url = MENU_URL[odds_type].format(
+                    event_id=event_id, geo_code=geo_code, geo_sub=geo_sub,
+                )
+                yield scrapy.Request(
+                    url=url,
+                    callback=self.parse_menu,
+                    errback=self.errback_menu,
+                    headers=BROWSER_HEADERS,
+                    cb_kwargs={"event_id": event_id, "odds_type": odds_type},
+                    dont_filter=True,
+                )
 
-    def parse_menu(self, response, event_id: str):
-        """Parse pobtm menu; yield ope2 requests for each bookmaker×betType×betScope."""
+    def parse_menu(self, response, event_id: str, odds_type: str):
+        """Parse one odds menu; yield an odds request per bookmaker/betType/betScope."""
         store = self._match_store.get(event_id)
         if store is None:
             return
 
+        feed = odds_type.lower()
+
         try:
             data = Jmes(response.text)
         except Exception as e:
-            logger.warning("Failed to parse pobtm for %s: %s", event_id, e)
-            yield from self._finalize(event_id)
+            logger.warning("Failed to parse the %s odds menu for %s: %s", feed, event_id, e)
+            store["menus_pending"] -= 1
+            yield from self._maybe_finalize(event_id)
             return
 
-        menu = data.select_dict("data.getPrematchOddsBettingTypeMenu", default={})
+        menu_path = MENU_PATH[odds_type]
+        menu = data.select_dict(menu_path, default={})
         if not menu:
-            logger.info("No odds menu for event_id=%s — may be invalid match ID", event_id)
-            yield from self._finalize(event_id)
+            logger.warning(
+                "No %s odds menu returned for event_id=%s (geoIpCode=%s "
+                "geoIpSubdivisionCode=%s): the match ID may be invalid, this region "
+                "publishes no odds menu, or the match is not in that state right now",
+                feed, event_id, *self._geo,
+            )
+            store["menus_pending"] -= 1
+            yield from self._maybe_finalize(event_id)
             return
 
         # Build bookmaker name lookup
-        for bm_entry in data.select_list("data.getPrematchOddsBettingTypeMenu.settings.bookmakers", default=[]):
+        for bm_entry in data.select_list(f"{menu_path}.settings.bookmakers", default=[]):
             bm = bm_entry.get("bookmaker") or {}
             bm_id = bm.get("id")
             if bm_id is not None:
-                bm_id_int = int(bm_id)
-                store["bm_acc"].setdefault(bm_id_int, {
-                    "name": str(bm.get("name") or bm_id),
-                    "markets": {},
-                })
+                self._register_bookmaker(
+                    store,
+                    int(bm_id),
+                    str(bm.get("name") or bm_id),
+                    # Appearing in the live menu proves the bookmaker takes in-play
+                    # bets; the pre-match menu states it outright.
+                    odds_type == LIVE or bool(bm_entry.get("hasLiveBettingOffers")),
+                )
 
         # Build list of (betType, betScope, [bookmaker_ids]) combos
-        ope2_requests: list[dict] = []
-        for item in data.select_list("data.getPrematchOddsBettingTypeMenu.items", default=[]):
+        menu_items = data.select_list(f"{menu_path}.items", default=[])
+        available_types = sorted({it.get("bettingType") for it in menu_items if it.get("bettingType")})
+        offers_in_menu = sum(len(it.get("bookmakerIds") or []) for it in menu_items)
+
+        odds_requests: list[dict] = []
+        for item in menu_items:
             bet_type = item.get("bettingType") or ""
             bet_scope = item.get("bettingScope") or ""
             if not bet_type or not bet_scope:
@@ -266,61 +373,121 @@ class FlashscoreOddsSpider(scrapy.Spider):
             if self._bet_types_filter and bet_type not in self._bet_types_filter:
                 continue
             for bm_id in (item.get("bookmakerIds") or []):
-                ope2_requests.append({
+                odds_requests.append({
                     "event_id": event_id,
                     "bookmaker_id": int(bm_id),
                     "bet_type": bet_type,
                     "bet_scope": bet_scope,
                 })
 
-        if not ope2_requests:
-            logger.info("No ope2 requests for event_id=%s (empty menu or all filtered)", event_id)
-            yield from self._finalize(event_id)
+        # Account for this menu and ALL of its requests before yielding any of them:
+        # the other feed's callbacks must never observe a zero counter while these
+        # requests are still to come, or the item would be emitted early.
+        store["menus_pending"] -= 1
+        store["pending"] += len(odds_requests)
+
+        if not odds_requests:
+            self._log_no_markets(event_id, odds_type, available_types, offers_in_menu)
+            yield from self._maybe_finalize(event_id)
             return
 
-        store["pending"] = len(ope2_requests)
-
-        for req in ope2_requests:
+        for req in odds_requests:
             yield scrapy.Request(
-                url=OPE2_URL.format(**req),
+                url=ODDS_URL[odds_type].format(**req),
                 callback=self.parse_odds,
                 errback=self.errback_ope2,
                 headers=BROWSER_HEADERS,
-                cb_kwargs=req,
+                cb_kwargs=dict(req, odds_type=odds_type),
                 dont_filter=True,
             )
 
-    def parse_odds(self, response, event_id: str, bookmaker_id: int, bet_type: str, bet_scope: str):
-        """Parse one ope2 response; yield item when all ope2 requests for the match complete."""
+    @staticmethod
+    def _register_bookmaker(store: dict, bm_id: int, name: str, offers_live: bool) -> dict:
+        """Create or update one bookmaker accumulator; never overwrites a known name."""
+        entry = store["bm_acc"].setdefault(bm_id, {
+            "name": name,
+            "has_live_betting": False,
+            "markets": {},
+        })
+        if offers_live:
+            entry["has_live_betting"] = True
+        return entry
+
+    def _maybe_finalize(self, event_id: str):
+        """Emit the item once every menu has answered and every odds request is done."""
+        store = self._match_store.get(event_id)
+        if store is None:
+            return
+        if store["pending"] <= 0 and store["menus_pending"] <= 0:
+            yield from self._finalize(event_id)
+
+    def _log_no_markets(self, event_id: str, odds_type: str, available_types: list[str],
+                        offers_in_menu: int):
+        """Explain WHY a match produced no odds requests.
+
+        The three causes need different action from the caller, so each gets its own
+        message: a region that publishes no bookmakers, a betTypes filter that matched
+        nothing, or a menu that listed bet types but published no bookmaker offers.
+        """
+        geo_code, geo_sub = self._geo
+
+        if offers_in_menu == 0:
+            logger.warning(
+                "No %s bookmaker offers for event_id=%s in region geoIpCode=%s "
+                "geoIpSubdivisionCode=%s. Flashscore publishes bookmakers per region and "
+                "validates against this run's exit IP, so odds visible in your own browser "
+                "may be absent here.",
+                odds_type.lower(), event_id, geo_code, geo_sub,
+            )
+            return
+
+        if self._bet_types_filter:
+            logger.warning(
+                "betTypes filter matched no %s market for event_id=%s: requested %s, but "
+                "this match offers only %s. Bet types differ by sport: football offers "
+                "HOME_DRAW_AWAY, OVER_UNDER, BOTH_TEAMS_TO_SCORE and DOUBLE_CHANCE; basketball "
+                "offers HOME_DRAW_AWAY, HOME_AWAY, OVER_UNDER and ASIAN_HANDICAP. "
+                "Remove betTypes to return every market this match offers.",
+                odds_type.lower(), event_id, sorted(self._bet_types_filter), available_types,
+            )
+            return
+
+        logger.warning(
+            "No %s odds markets for event_id=%s (geoIpCode=%s geoIpSubdivisionCode=%s); the "
+            "menu listed %s but published no bookmaker offers.",
+            odds_type.lower(), event_id, geo_code, geo_sub, available_types,
+        )
+
+    def parse_odds(self, response, event_id: str, bookmaker_id: int, bet_type: str,
+                   bet_scope: str, odds_type: str):
+        """Parse one odds response; emit the item once the match has no work left."""
         store = self._match_store.get(event_id)
         if store is None:
             return
 
         try:
             data = Jmes(response.text)
-            fp = data.select_dict("data.findPrematchOddsForBookmaker", default={})
+            fp = data.select_dict(ODDS_PATH[odds_type], default={})
         except Exception as e:
-            logger.warning("ope2 parse error for %s bm=%s bt=%s/%s: %s",
-                           event_id, bookmaker_id, bet_type, bet_scope, e)
+            logger.warning("%s odds parse error for %s bm=%s bt=%s/%s: %s",
+                           odds_type.lower(), event_id, bookmaker_id, bet_type, bet_scope, e)
             fp = {}
 
         if fp:
             odds_rows = _parse_ope2_odds(fp)
             if odds_rows:
-                bm_entry = store["bm_acc"].get(bookmaker_id)
-                if bm_entry is None:
-                    bm_entry = {"name": str(bookmaker_id), "markets": {}}
-                    store["bm_acc"][bookmaker_id] = bm_entry
-                bm_entry["markets"][(bet_type, bet_scope)] = {
+                bm_entry = self._register_bookmaker(store, bookmaker_id, str(bookmaker_id), False)
+                # Keyed by feed too, so a live market never overwrites its pre-match twin.
+                bm_entry["markets"][(odds_type, bet_type, bet_scope)] = {
+                    "odds_type": odds_type,
                     "bet_type": bet_type,
                     "bet_scope": bet_scope,
-                    "has_live_betting": False,
+                    "has_live_betting": bm_entry.get("has_live_betting", False),
                     "odds": odds_rows,
                 }
 
         store["pending"] -= 1
-        if store["pending"] <= 0:
-            yield from self._finalize(event_id)
+        yield from self._maybe_finalize(event_id)
 
     def _finalize(self, event_id: str):
         """Build and yield the MatchOddsItem for a match."""
@@ -355,8 +522,13 @@ class FlashscoreOddsSpider(scrapy.Spider):
     def errback_menu(self, failure):
         request = failure.request
         event_id = request.cb_kwargs.get("event_id", "unknown")
-        logger.warning("pobtm failed for event_id=%s: %s", event_id, repr(failure.value))
-        yield from self._finalize(event_id)
+        odds_type = request.cb_kwargs.get("odds_type", PREMATCH)
+        logger.warning("The %s odds menu failed for event_id=%s: %s",
+                       odds_type.lower(), event_id, repr(failure.value))
+        store = self._match_store.get(event_id)
+        if store is not None:
+            store["menus_pending"] -= 1
+            yield from self._maybe_finalize(event_id)
 
     def errback_ope2(self, failure):
         request = failure.request
@@ -364,10 +536,10 @@ class FlashscoreOddsSpider(scrapy.Spider):
         bet_type = request.cb_kwargs.get("bet_type", "?")
         bet_scope = request.cb_kwargs.get("bet_scope", "?")
         bm_id = request.cb_kwargs.get("bookmaker_id", "?")
-        logger.warning("ope2 failed for %s bm=%s bt=%s/%s: %s",
-                       event_id, bm_id, bet_type, bet_scope, repr(failure.value))
+        odds_type = request.cb_kwargs.get("odds_type", PREMATCH)
+        logger.warning("A %s odds request failed for %s bm=%s bt=%s/%s: %s",
+                       odds_type.lower(), event_id, bm_id, bet_type, bet_scope, repr(failure.value))
         store = self._match_store.get(event_id)
         if store is not None:
             store["pending"] -= 1
-            if store["pending"] <= 0:
-                yield from self._finalize(event_id)
+            yield from self._maybe_finalize(event_id)
