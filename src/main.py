@@ -37,8 +37,9 @@ KNOWN_BET_TYPES = frozenset({
 })
 
 # oddsType input -> the feeds the spider reads. The default reads both, so a run
-# returns everything the match publishes: pre-match lines always, plus in-play
-# prices while it is being played. Each market carries odds_type to tell them apart.
+# returns everything the match publishes: pre-match lines always, plus the in-play
+# prices once the match has kicked off (Flashscore keeps those after it finishes).
+# Each market carries odds_type to tell them apart.
 ODDS_TYPE_FEEDS = {
     'prematch': ['PREMATCH'],
     'live': ['LIVE'],
@@ -90,13 +91,13 @@ async def main() -> None:
         if odds_type == 'prematch':
             Actor.log.info(
                 'Reading pre-match odds only (current and opening lines). Set oddsType to '
-                '"both" to also get in-play prices while a match is being played.'
+                '"both" to also get the in-play prices once a match has kicked off.'
             )
         else:
             Actor.log.info(
                 f'Reading {" and ".join(f.lower() for f in feeds)} odds. Live odds exist only '
-                f'while a match is in play, so a match that has not started or has finished '
-                f'returns no live markets; every market carries odds_type.'
+                f'once a match has kicked off and are kept after it ends, so a match that '
+                f'has not started yet returns no live markets; every market carries odds_type.'
             )
 
         # Warn on bet types that can never match, so a filter typo does not look

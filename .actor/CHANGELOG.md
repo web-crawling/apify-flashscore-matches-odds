@@ -8,8 +8,10 @@
   is being played, the in-play prices. Previously the default was `prematch`, so live
   odds had to be asked for explicitly.
 - Nothing is removed by this change: the pre-match markets a run returned before are
-  still returned. A match in play simply returns additional markets tagged
-  `odds_type: "LIVE"`.
+  still returned. A match that has kicked off simply returns additional markets tagged
+  `odds_type: "LIVE"`. In-play prices appear at kick-off and Flashscore keeps them
+  after the match ends, so completed matches carry them too; only matches that have
+  not started yet return pre-match markets alone.
 - **If you match on `bet_type` alone, key on `odds_type` as well.** During a live
   match the same `bet_type` now appears once per feed. Set `oddsType: "prematch"` to
   restore exactly the previous behaviour.

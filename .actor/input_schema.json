@@ -25,7 +25,7 @@
 			"title": "Odds Type",
 			"type": "string",
 			"editor": "select",
-			"description": "Which odds to return. 'Both' (the default) returns everything the match publishes: the pre-match lines, plus in-play prices while the match is being played — each market tagged with odds_type so you can tell them apart. 'Pre-match' returns only the current and opening pre-match lines, the only odds that exist before kick-off. 'Live' returns only in-play prices, which exist only while a match is actually being played, including in-play-only markets such as next goal.",
+			"description": "Which odds to return. 'Both' (the default) returns everything the match publishes: the pre-match lines, plus the in-play prices once the match has kicked off — each market tagged with odds_type so you can tell them apart. 'Pre-match' returns only the current and opening pre-match lines, the only odds that exist before kick-off. 'Live' returns only in-play prices, including in-play-only markets such as next goal; these appear at kick-off and are kept after the match ends, so a match that has not started returns nothing.",
 			"default": "both",
 			"enum": ["prematch", "live", "both"],
 			"enumTitles": [
